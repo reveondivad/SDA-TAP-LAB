@@ -60,7 +60,10 @@ export const fetchObjectsOfInterest = async () => {
       commonName: obj.OBJECT_NAME || obj.name || obj.NAME,
       country: obj.COUNTRY_CODE || obj.country || obj.COUNTRY,
       catalogType: obj.OBJECT_TYPE || obj.type || obj.CATEGORY || 'UNKNOWN',
-      priority: obj.PRIORITY || '4'
+      priority: obj.PRIORITY || '4',
+      col_indicators: obj.COL_INDICATORS || [],
+      row_indicators: obj.ROW_INDICATORS || [],
+      matrix: obj.MATRIX || [],
     }));
     
     // Update the store with the new data
@@ -187,7 +190,7 @@ export const updateObject = (objectID: string, updates: Partial<ObjectOfInterest
 };
 
 // Highlight an object
-export const highlightObject = (objectID: string, highlight: boolean = true) => {
+export const highlightObject = (objectID: string, highlight: boolean = true,) => {
   updateObject(objectID, { highlighted: highlight });
   console.log(`Object ${objectID} highlight set to ${highlight}`);
   

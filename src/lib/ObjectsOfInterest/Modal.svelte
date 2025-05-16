@@ -18,13 +18,17 @@
     data,
     columnDefs,
     gridApi
-  } from "@/stores/datatable.store";
+  } from "@/stores/ooi_datatable.store";
   
   // Import AG Grid
   import { Grid } from 'ag-grid-community';
-  import { Color } from "orbpro";
-    import { viewer } from "@/stores/viewer.store";
+  import { Color, JulianDate } from "orbpro";
+  import { viewer } from "@/stores/viewer.store";
  
+  // State for detailed view
+  let selectedObject = null;
+  let showDetailPanel = false;
+  let detailMatrixData = null;
   
   const { trackedEntity } = scenario;
   let _shouldAnimate = true;
@@ -62,14 +66,76 @@
     }
   ];
   
+  // Function to generate matrix data for the selected object
+  function generateMatrixData(objectData) {
+    // Create a simple matrix structure similar to the event details component
+    return {
+      rowIndicators: objectData.row_indicators,
+      colIndicators: objectData.col_indicators,
+      matrix: objectData.matrix
+    };
+  }
+  
+  // Function to show the detail panel for an object
+  function showObjectDetails(objectData) {
+    const sDC = (globalThis as any).viewer?.dataSources.getByName("spaceaware")[0];
+    const entity = sDC?.entities.getById(objectData.objectID);
+    entity.point.color = Color.GREEN;
+    if (selectedObject) {
+      const old_entity = sDC?.entities.getById(selectedObject.objectID)
+      old_entity.point.color = Color.RED
+    }
+    selectedObject = objectData;
+    detailMatrixData = generateMatrixData(objectData);
+    showDetailPanel = true;
+  }
+  
+  // Function to close the detail panel
+  function closeDetailPanel(object) {
+    console.log(object)
+    const sDC = (globalThis as any).viewer?.dataSources.getByName("spaceaware")[0];
+    const entity = sDC?.entities.getById(object.objectID);
+    entity.point.color = Color.RED;
+    showDetailPanel = false;
+    selectedObject = null;
+  }
+  
+  // Function to get cell class for the matrix
+  function getCellClass(rowIndex, colIndex) {
+    if (!detailMatrixData) return "";
+    
+    const matrixIndex = rowIndex * detailMatrixData.colIndicators.length + colIndex;
+    if (matrixIndex < detailMatrixData.matrix.length) {
+      return detailMatrixData.matrix[matrixIndex] ? "bg-red-600" : "bg-green-600";
+    }
+    return "";
+  }
+  
+  // Function to get cell value for the matrix
+  function getCellValue(rowIndex, colIndex) {
+    if (!detailMatrixData) return "";
+    
+    const matrixIndex = rowIndex * detailMatrixData.colIndicators.length + colIndex;
+    if (matrixIndex < detailMatrixData.matrix.length) {
+      return detailMatrixData.matrix[matrixIndex] ? "Alert" : "Normal";
+    }
+    return "";
+  }
+  
+  // Function to set the clock to a specific time
+  function setClockToTime(timeString) {
+    if (!timeString) return;
+    
+    const time = JulianDate.fromDate(new Date(timeString));
+    (globalThis as any).viewer!.clock.currentTime = time;
+  }
+  
   // Function to initialize the AG Grid
   function initializeGrid() {
     if (!gridDiv) {
       console.error("Grid div not found");
       return;
     }
-    
-   
     
     // Create new grid instance
     const gridOptions = {
@@ -80,12 +146,10 @@
       },
       onGridReady: (params) => {
         gridApi.set(params.api);
-       
         
         // Add row click event handler
         params.api.addEventListener('rowClicked', (event) => {
           const objectID = event.data.objectID;
-         
           
           // Find entity in the viewer
           const sDC = (globalThis as any).viewer?.dataSources.getByName("spaceaware")[0];
@@ -93,8 +157,11 @@
           
           if (entity) {
             // Focus camera on the entity
-            $trackedEntity = entity;
+            // $trackedEntity = entity;
             highlightObject(objectID);
+            
+            // Show detailed view for the clicked object
+            showObjectDetails(event.data);
             
             // Start animation if needed
             scenario.settings.ClockSettings.shouldAnimate.set(true);
@@ -128,7 +195,6 @@
     
     // Get all object IDs from our objects of interest
     const objectIDs = $objectsOfInterestData.map(obj => obj.objectID);
-   
     
     // Store original properties and set new ones
     sDC.entities.suspendEvents();
@@ -147,8 +213,7 @@
       originalEntityProperties.set(entity.id, originalProperties);
       
       // If this entity is in our objects of interest list
-      if (objectIDs.includes(entity.id)) {
-        // console.log("highlighting!")
+      if (objectIDs.includes(entity.id.toString())) {
         // Make it visible
         entity.show = true;
         
@@ -163,7 +228,7 @@
           entity.label.show = true;
           
           // Find the common name from our data
-          const objectData = $objectsOfInterestData.find(obj => obj.objectID === entity.id);
+          const objectData = $objectsOfInterestData.find(obj => obj.objectID === entity.id.toString());
           if (objectData) {
             entity.label.text = objectData.commonName;
           }
@@ -181,6 +246,8 @@
     if (!viewer) return;
     
     const sDC = viewer?.dataSources.getByName("spaceaware")[0];
+    if (!sDC) return;
+    
     sDC.entities.suspendEvents();
 
     sDC?.entities.values.forEach((e: any) => {
@@ -206,11 +273,6 @@
     _shouldAnimate = (globalThis as any).viewer?.clock.shouldAnimate || true;
     scenario.settings.ClockSettings.shouldAnimate.set(true);
     scenario.settings.ClockSettings.multiplier.set(30);
-    
-    
-    
-    
-    
     
     // First make sure we have data set
     console.log("Current data in store:", $objectsOfInterestData.length, "objects");
@@ -240,7 +302,7 @@
     // Initialize the grid
     setTimeout(() => {
       initializeGrid();
-    }, 100); // Small delay to ensure DOM is ready
+    }, 100); // Small delay
     
     // Highlight objects in the viewer
     highlightAllObjectsOfInterest();
@@ -304,6 +366,7 @@
   async function refreshData() {
     console.log("Refresh requested");
     try {
+      isLoading.set(true);
       await fetchObjectsOfInterest();
       sortObjectsByPriority();
       
@@ -316,8 +379,10 @@
       
       // Update highlighted objects with new data
       highlightAllObjectsOfInterest();
+      isLoading.set(false);
     } catch (error) {
       console.error("Failed to refresh data", error);
+      isLoading.set(false);
     }
   }
   
@@ -376,16 +441,99 @@
       <CloseButton onclick={closeModal} />
     </div>
     
-    <!-- Table container - height is important here -->
-    <div class="w-full ag-theme-balham-dark" style="height: 300px; max-height: 40vh;">
-      <!-- This div needs to have the ag-theme class for the DataTable to work properly -->
-      <div bind:this={gridDiv} id="ooiDataTable" class="w-full h-full">
-        {#if !$datatableShow}
-          <div class="flex items-center justify-center h-full">
-            <p class="text-gray-400">Loading data table...</p>
-          </div>
-        {/if}
+    <!-- Flex container for main table and detail panel -->
+    <div class="flex flex-row w-full" style="height: 300px; max-height: 40vh;">
+      <!-- Table container - adjust width based on detail panel visibility -->
+      <div class="ag-theme-balham-dark" style="{showDetailPanel ? 'width: 60%;' : 'width: 100%;'}">
+        <!-- This div needs to have the ag-theme class for the DataTable to work properly -->
+        <div bind:this={gridDiv} id="ooiDataTable" class="w-full h-full">
+          {#if !$datatableShow}
+            <div class="flex items-center justify-center h-full">
+              <p class="text-gray-400">Loading data table...</p>
+            </div>
+          {/if}
+        </div>
       </div>
+      
+      <!-- Detail panel - shown when an object is selected -->
+      {#if showDetailPanel && selectedObject}
+        <div class="bg-gray-800 border-l border-gray-600 overflow-y-auto" style="width: 40%;">
+          <div class="p-2 relative">
+            <!-- Close button for detail panel -->
+            <button 
+              class="absolute top-2 right-2 text-gray-400 hover:text-white text-xl font-bold"
+              on:click={closeDetailPanel(selectedObject)}>
+              ×
+            </button>
+            
+            <!-- Object details -->
+            <div class="text-left flex flex-col items-start justify-between mb-4 w-full font-mono text-sm">
+              <div>
+                <div>NAME: {selectedObject.commonName}</div>
+              </div>
+              <div>
+                <div class="cursor-pointer" on:click={() => { $trackedEntity = selectedObject; }}>
+                  ID: {selectedObject.objectID}
+                </div>
+              </div>
+              <div>
+                PRIORITY: {selectedObject.priority}
+              </div>
+              <div>
+                <div>COUNTRY: {selectedObject.country}</div>
+              </div>
+              <div>
+                <div>TYPE: {selectedObject.catalogType}</div>
+              </div>
+            </div>
+            
+            <!-- Matrix display -->
+            {#key detailMatrixData}
+              {#if detailMatrixData?.colIndicators?.length}
+                <div class="overflow-auto p-2 w-full">
+                  <table class="w-full border-collapse">
+                    <tr>
+                      <th></th>
+                      {#each detailMatrixData.colIndicators as colIndicator}
+                        <th class="border px-2 whitespace-nowrap w-6 h-6">{colIndicator}</th>
+                      {/each}
+                    </tr>
+                    {#if detailMatrixData.rowIndicators}
+                      {#each detailMatrixData.rowIndicators as rowIndicator, rowIndex}
+                        <tr>
+                          <th class="border px-2 w-6 h-6">{rowIndicator}</th>
+                          {#each detailMatrixData.colIndicators as _, colIndex}
+                            <td
+                              class="border text-center font-bold w-6 h-6 {getCellClass(rowIndex, colIndex)}"
+                            >{getCellValue(rowIndex, colIndex)}</td>
+                          {/each}
+                        </tr>
+                      {/each}
+                    {/if}
+                  </table>
+                </div>
+              {/if}
+            {/key}
+            
+            <!-- Additional info section -->
+            <div class="mt-4 text-xs">
+              <h4 class="font-bold mb-2">Additional Information</h4>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <span class="font-semibold">Nomination Time:</span> 
+                  {selectedObject.eventStartTime || 'N/A'}
+                </div>
+                <div>
+                  <span class="font-semibold">Status:</span> 
+                  <span class={selectedObject.priority <= 6 ? 'text-red-400' : 'text-green-400'}>
+                    {'Class Violator'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
   </div>
 </div>
@@ -406,5 +554,16 @@
   button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+  
+  /* Matrix display styles */
+  .bg-red-600 {
+    background-color: rgb(220, 38, 38);
+    color: white;
+  }
+  
+  .bg-green-600 {
+    background-color: rgb(22, 163, 74);
+    color: white;
   }
 </style>

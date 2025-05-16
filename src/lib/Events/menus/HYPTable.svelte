@@ -104,9 +104,23 @@
   }
   
   onMount(() => {
+  const existingSensor = viewer?.entities.getById('ground-sensor');
+  if (existingSensor) {
+    viewer.entities.remove(existingSensor);
+  }
+  
+  const existingCone = viewer?.entities.getById('visibility-cone');
+  if (existingCone) {
+    viewer.entities.remove(existingCone);
+  }
+  
+  // Reset state variables
+  flashingCellsArray = [];
+  flashingCellsVersion = 0;
+  priorityFlashing = false;
     // Check if this is a demo event
     isDemoMode = !!$activeEvent?.DEMO;
-    console.log("Demo mode:", isDemoMode);
+
     $activeGroup = "defaultGroup";
     const sDC = viewer?.dataSources.getByName("spaceaware")[0];
     setTimeout(() => 
@@ -142,8 +156,13 @@
       !isNaN(eventStartTimeDate.getTime()) &&
       !isNaN(eventEndTimeDate.getTime())
     ) {
+
       startTime = JulianDate.fromDate(eventStartTimeDate);
       endTime = JulianDate.fromDate(eventEndTimeDate);
+      setTimeout(() => {
+      viewer.clock.currentTime = startTime;
+    }, 1000);
+    
       
       // Only set up scheduled updates if in demo mode
       if (isDemoMode) {
@@ -159,13 +178,11 @@
       console.error("Invalid date format");
     }
     
-    setTimeout(() => {
-      viewer.clock.currentTime = startTime;
-    }, 1000);
     
     // Only set up clock listener if in demo mode
     let clockTickListener = null;
     if (isDemoMode) {
+      viewer.clock.currentTime = startTime;
       // Watch for clock changes to trigger updates based on time
       clockTickListener = viewer.clock.onTick.addEventListener((clock) => {
         const currentTime = JulianDate.toDate(clock.currentTime);
@@ -179,10 +196,12 @@
 
   function displaySensor(startTime) {
     // Schedule sensor activation 10 seconds after event start
+
     const sensorActivationTime = new Date(startTime.getTime() + 130000);
+
     // Schedule sensor deactivation 2 minutes after activation
     const sensorDeactivationTime = new Date(startTime.getTime() + 200000);
-    
+
     const sDC = viewer?.dataSources.getByName("spaceaware")[0];
 
     scheduledUpdates.push({
@@ -202,6 +221,7 @@
       },
       executed: false
     });
+   
 
     // Schedule sensor activation
     scheduledUpdates.push({
@@ -214,7 +234,7 @@
           
           // Create cone-shaped visibility indicator
           if (sensor && entity) {
-            console.log('Creating visibility cone.');
+           
             createVisibilityCone(sensor, entity);
             
             // Add notification or visual indicator that sensor is active
@@ -233,7 +253,6 @@
       time: sensorDeactivationTime,
       update: () => {
         if (sensorEntity) {
-          console.log('Deactivating sensor.');
           // Change sensor appearance to indicate it's inactive
           sensorEntity.point.color = new ConstantProperty(Color.GRAY);
           if (sensorEntity.label) {
@@ -242,8 +261,10 @@
           
           // Remove the visibility cone
           if (sensorCone) {
+           
             viewer.entities.remove(sensorCone);
             sensorCone = null;
+          
           }
         }
       },
@@ -264,9 +285,9 @@
           const updatedEvent = {...$activeEvent};
           const matrixCopy = [...updatedEvent.MATRIX];
           
-          // VMAG is index 1, AMR is index 2 in the first row
+          // VMAG is index 1, TC is index 3 in the first row
           matrixCopy[1] = true; // Update VMAG
-          matrixCopy[3] = true; // Update AMR
+          matrixCopy[3] = true; // Update TC
           
           // Update the matrix in the copy
           updatedEvent.MATRIX = matrixCopy;
@@ -326,23 +347,17 @@
     
     scheduledUpdates.forEach(update => {
       if (!update.executed && currentTime >= update.time) {
-        console.log(`Executing update scheduled for ${update.time}`);
         update.update();
         update.executed = true;
         updatesExecuted = true;
       }
     });
     
-    if (updatesExecuted) {
-      // Maybe add a notification or indicator here if needed
-      console.log("Updates applied to matrix");
-    }
   }
   
   // Function to make a cell flash
   function flashCell(rowIndex, colIndex) {
     const cellKey = `${rowIndex}-${colIndex}`;
-    console.log(`Setting cell ${cellKey} to flash`);
     
     // Add to flashing cells array
     flashingCellsArray.push(cellKey);
@@ -350,20 +365,19 @@
     
     // Stop flashing after 2 seconds
     setTimeout(() => {
-      console.log(`Stopping flash for cell ${cellKey}`);
       
       // Remove from array
       const index = flashingCellsArray.indexOf(cellKey);
       if (index > -1) {
         flashingCellsArray.splice(index, 1);
         flashingCellsVersion++; // Increment again to force reactivity
-        console.log(`Removed cell ${cellKey}, remaining: ${flashingCellsArray.join(', ')}`);
       }
     }, 2000);
   }
 
   onDestroy(() => {
     $activeGroup = "defaultGroup";
+    
     const sDC = (globalThis as any).viewer?.dataSources.getByName(
       "spaceaware"
     )[0];
@@ -375,9 +389,13 @@
     }
     // Remove sensor 
     if (sensorEntity) {
-      console.log("Removing ground sensor");
       viewer.entities.remove(sensorEntity);
       sensorEntity = null;
+    }
+
+    if (sensorCone) {
+      viewer.entities.remove(sensorCone);
+      sensorCone = null;
     }
     
     // Clear scheduled updates
@@ -403,7 +421,9 @@
         (e as SpaceEntity).showOrbit({ show: false });
         e.show = true;
       }
-    });
+    }
+    
+  );
 
     // Restore label settings onDestroy
     sDC?.entities.values.forEach((e: Entity) => {
@@ -441,6 +461,7 @@
       return $activeEvent?.MATRIX[matrixIndex] ? "bg-red-600" : "bg-green-600";
     }
     return "";
+    
   }
 
   function getCellValue(rowIndex: any, colIndex: any) {
@@ -478,65 +499,8 @@
     
     // Set tracked entity
     $trackedEntity = entity;
-    
-    // Set a better initial view if requested (for the demo)
-    if (withBetterView && isDemoMode) {
-      setTimeout(() => {
-        console.log("Setting better initial view");
-        setBetterView();
-      }, 1000); // Wait a second after tracking is set
-    }
   }
   
-  // Function to set a better initial camera view using camera movement methods
-  function setBetterView() {
-    if (!viewer || !viewer.camera) return;
-    
-    const camera = viewer.camera;
-    
-    try {
-      // Store original camera orientation for reference
-      const originalHeading = camera.heading;
-      const originalPitch = camera.pitch;
-      const originalRoll = camera.roll;
-      
-      // Calculate camera height to set appropriate move rates
-      const ellipsoid = viewer.scene.globe.ellipsoid;
-      const cameraHeight = ellipsoid.cartesianToCartographic(camera.position).height;
-      
-      // Set move rates relative to camera height
-      const BACKWARD_MOVE_FACTOR = 3.0; // How far to zoom out
-      const LEFT_MOVE_FACTOR = 0.6;    // How far to move left
-      const UP_MOVE_FACTOR = 0.3;      // How far to move up
-      
-      // Calculate actual move distances
-      const moveBackwardDistance = cameraHeight * BACKWARD_MOVE_FACTOR;
-      const moveLeftDistance = cameraHeight * LEFT_MOVE_FACTOR;
-      const moveUpDistance = cameraHeight * UP_MOVE_FACTOR;
-      
-      console.log(`Camera height: ${cameraHeight}, move backward: ${moveBackwardDistance}`);
-      
-      // Apply the movements in sequence
-      camera.moveBackward(moveBackwardDistance);
-      camera.moveLeft(moveLeftDistance);
-      camera.moveUp(moveUpDistance);
-      
-      // Slight rotation to look at entity from a better angle
-      camera.lookRight(0.1);
-      camera.lookDown(0.05);
-      
-      console.log("Better view applied using camera movement");
-      
-      // Store original parameters for cleanup if needed
-      originalEntityProperties.set('originalCameraView', {
-        heading: originalHeading,
-        pitch: originalPitch,
-        roll: originalRoll
-      });
-    } catch (error) {
-      console.error("Error setting better view:", error);
-    }
-  }
 
   // Function to handle cell click
   function onCellClick(rowIndex: number) {
@@ -598,7 +562,6 @@
     
     // Add the sensor to the viewer
     viewer.entities.add(sensorEntity);
-    console.log("Sensor created at:", latitude, longitude);
     
     return sensorEntity;
   }
@@ -656,11 +619,10 @@
         
         // Styling for the cone
         material: Color.YELLOW.withAlpha(0.4),
-        cornerType: 1 
+        cornerType: 0 
       }
     });
 
-    console.log("Visibility cone created");
     return sensorCone;
   }
 </script>
