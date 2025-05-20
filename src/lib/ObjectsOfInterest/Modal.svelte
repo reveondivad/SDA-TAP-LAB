@@ -442,7 +442,7 @@
     </div>
     
     <!-- Flex container for main table and detail panel -->
-    <div class="flex flex-row w-full" style="height: 300px; max-height: 40vh;">
+    <div class="flex flex-row w-full" style="height: 300px; max-height: 25vh;">
       <!-- Table container - adjust width based on detail panel visibility -->
       <div class="ag-theme-balham-dark" style="{showDetailPanel ? 'width: 60%;' : 'width: 100%;'}">
         <!-- This div needs to have the ag-theme class for the DataTable to work properly -->
@@ -457,7 +457,7 @@
       
       <!-- Detail panel - shown when an object is selected -->
       {#if showDetailPanel && selectedObject}
-        <div class="bg-gray-800 border-l border-gray-600 overflow-y-auto" style="width: 40%;">
+        <div class="bg-gray-800 border-l border-gray-600 overflow-y-auto h-full" style="width: 100%;">
           <div class="p-2 relative">
             <!-- Close button for detail panel -->
             <button 
@@ -467,26 +467,24 @@
             </button>
             
             <!-- Object details -->
-            <div class="text-left flex flex-col items-start justify-between mb-4 w-full font-mono text-sm">
-              <div>
-                <div>NAME: {selectedObject.commonName}</div>
+            <div class="text-left flex flex-row flex-wrap gap-3 mb-4 w-full font-mono text-sm">
+              <div class="px-2 py-1 bg-gray-700 rounded">
+                <span class="font-semibold">NAME:</span> {selectedObject.commonName}
               </div>
-              <div>
-                <div class="cursor-pointer" on:click={() => { $trackedEntity = selectedObject; }}>
-                  ID: {selectedObject.objectID}
-                </div>
+              <div class="px-2 py-1 bg-gray-700 rounded cursor-pointer" on:click={() => { $trackedEntity = selectedObject; }}>
+                <span class="font-semibold">ID:</span> {selectedObject.objectID}
               </div>
-              <div>
-                PRIORITY: {selectedObject.priority}
+              <div class="px-2 py-1 bg-gray-700 rounded">
+                <span class="font-semibold">PRIORITY:</span> {selectedObject.priority}
               </div>
-              <div>
-                <div>COUNTRY: {selectedObject.country}</div>
+              <div class="px-2 py-1 bg-gray-700 rounded">
+                <span class="font-semibold">COUNTRY:</span> {selectedObject.country}
               </div>
-              <div>
-                <div>TYPE: {selectedObject.catalogType}</div>
+              <div class="px-2 py-1 bg-gray-700 rounded">
+                <span class="font-semibold">TYPE:</span> {selectedObject.catalogType}
               </div>
             </div>
-            
+                        
             <!-- Matrix display -->
             {#key detailMatrixData}
               {#if detailMatrixData?.colIndicators?.length}

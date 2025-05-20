@@ -87,7 +87,7 @@
 </script>
 
 <div
-  class="fixed mt-12 pr-2 pl-2 flex justify-end items-start w-full md:w-[50%] h-[35%] md:h-[34%] max-h-[350px] right-0 rounded">
+  class="fixed mt-12 pr-2 pl-2 flex justify-end items-start w-full md:w-[20%] h-[30%] md:h-[34%] max-h-[20vh] right-0 rounded">
   <div class="text-white flex flex-col bg-gray-800">
     <div
       class="select-none flex justify-between items-center pl-2 pr-3 pt-2 pb-2 md:pt-2 md:pb-2 border-b border-gray-600 text-white">
