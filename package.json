@@ -38,7 +38,7 @@
     "dependencies": {
         "@fortawesome/free-brands-svg-icons": "^6.7.2",
         "@fortawesome/free-solid-svg-icons": "^6.7.2",
-        "ag-grid-community": "^33.2.4",
+        "ag-grid-community": "^31.3.4",
         "buffer": "^6.0.3",
         "coi-serviceworker": "^0.1.7",
         "d3": "^7.9.0",
