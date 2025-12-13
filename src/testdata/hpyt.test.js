@@ -14,8 +14,8 @@ export default [
           "CATEGORY": "SATELLITE STATUS DEMO",
           "COUNTRY_CODE": "CN",
           "ANALYSIS_METHOD": "Orbital Pattern Analysis",
-          "EVENT_START_TIME": "2025-05-17T00:45:00.000Z",
-          "EVENT_END_TIME": "2025-05-17T00:50:00.000Z",
+          "EVENT_START_TIME": "2025-05-17T00:47:00.000Z",
+          "EVENT_END_TIME": "2025-05-17T00:52:00.000Z",
           "PRIORITY": "4",  // This will change to "2" during the demo
           "DEMO": true,  // Flag to enable demo mode
           "SENSOR_LOCATION": {
